@@ -8,10 +8,8 @@ load_dotenv()
 
 # Platform payout rates
 PLATFORM_PAYOUTS: Dict[str, float] = {
-    'spotify': float(os.getenv('PLATFORM_PAYOUT_SPOTIFY', '0.0035')),
-    'apple': float(os.getenv('PLATFORM_PAYOUT_APPLE', '0.005')),
-    'youtube': float(os.getenv('PLATFORM_PAYOUT_YOUTUBE', '0.001')),
-    'beatport': float(os.getenv('PLATFORM_PAYOUT_BEATPORT', '0.75'))
+    'spotify': float(os.getenv('PLATFORM_PAYOUT_SPOTIFY', '0.0024')),
+    'beatport': float(os.getenv('PLATFORM_PAYOUT_BEATPORT', '1.25'))
 }
 
 # נתיבים
@@ -21,7 +19,8 @@ OUTPUT_DIR = BASE_DIR / 'output'
 MODELS_DIR = BASE_DIR / 'models'
 
 # מסד נתונים
-DATABASE_URL = f"sqlite:///{BASE_DIR}/mvp.db"
+DB_PATH = os.getenv('DB_PATH', 'mvp.db')
+DATABASE_URL = os.getenv('DATABASE_URL', f"sqlite:///{BASE_DIR}/mvp.db")
 
 # פלטפורמות
 PLATFORMS = ['Spotify', 'Sales', 'Overall']
@@ -64,26 +63,26 @@ MUSIC_EVENTS = {
 
 # הגדרות Prophet
 PROPHET_SETTINGS = {
-    'changepoint_prior_scale': 0.05,
-    'seasonality_prior_scale': 10.0,
-    'holidays_prior_scale': 10.0,
-    'seasonality_mode': 'multiplicative'
+    'changepoint_prior_scale': float(os.getenv('PROPHET_CHANGEPOINT_PRIOR_SCALE', '0.05')),
+    'seasonality_prior_scale': float(os.getenv('PROPHET_SEASONALITY_PRIOR_SCALE', '10.0')),
+    'holidays_prior_scale': float(os.getenv('PROPHET_HOLIDAYS_PRIOR_SCALE', '10.0')),
+    'seasonality_mode': os.getenv('PROPHET_SEASONALITY_MODE', 'multiplicative')
 }
 
 # הגדרות XGBoost
 XGBOOST_SETTINGS = {
-    'max_depth': 6,
-    'learning_rate': 0.1,
-    'n_estimators': 100,
+    'max_depth': int(os.getenv('XGB_MAX_DEPTH', '6')),
+    'learning_rate': float(os.getenv('XGB_LEARNING_RATE', '0.1')),
+    'n_estimators': int(os.getenv('XGB_N_ESTIMATORS', '100')),
     'objective': 'reg:squarederror'
 }
 
 # הגדרות LSTM
 LSTM_SETTINGS = {
-    'units': 50,
-    'dropout': 0.2,
-    'epochs': 100,
-    'batch_size': 32
+    'units': int(os.getenv('LSTM_UNITS', '50')),
+    'dropout': float(os.getenv('LSTM_DROPOUT', '0.2')),
+    'epochs': int(os.getenv('LSTM_EPOCHS', '100')),
+    'batch_size': int(os.getenv('LSTM_BATCH_SIZE', '32'))
 }
 
 # יצירת תיקיות אם לא קיימות
@@ -91,7 +90,6 @@ for dir_path in [RAW_DATA_DIR, OUTPUT_DIR, MODELS_DIR]:
     dir_path.mkdir(exist_ok=True)
 
 # Database settings
-DB_PATH = 'mvp.db'
 SAMPLE_DATA_DIR = 'sample_data'
 
 # Prophet settings
