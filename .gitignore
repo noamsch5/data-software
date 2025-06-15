@@ -32,11 +32,11 @@ ENV/
 
 # Project specific
 data/
-input/
+input/*
+!input/*.csv
 processed/
 *.db
 *.parquet
-*.csv
 *.xlsx
 *.xls
 

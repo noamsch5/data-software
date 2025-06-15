@@ -88,9 +88,8 @@ if not os.path.exists(DB_PATH):
 # Read forecast files
 forecast_files = glob.glob("forecast_*.parquet")
 if not forecast_files:
-    st.warning("No forecast files found. Running forecast generation...")
-    run_forecast()
-    forecast_files = glob.glob("forecast_*.parquet")
+    st.warning("No forecast files found. Please upload input data and run ETL.")
+    st.stop()
 
 # Read all forecasts
 dfs = []

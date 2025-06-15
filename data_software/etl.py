@@ -449,6 +449,9 @@ def process_distribution_statements():
     all_data = []
 
     files = glob.glob(os.path.join(input_dir, '*.csv'))
+    if not files:
+        print("No input files found in 'input/'. Please upload at least one CSV file.")
+        return pd.DataFrame()
     print(f"Found {len(files)} files in directory: {input_dir}")
     for file_path in files:
         print(f'---\nChecking file: {file_path}')
