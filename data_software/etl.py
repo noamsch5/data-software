@@ -455,9 +455,11 @@ def process_distribution_statements():
         print("No input files found in 'input/' or 'data_software/input/'. Please upload at least one CSV file.")
         return pd.DataFrame()
     for file_path in found_files:
-        print(f"Processing file: {file_path}")
+        print(f"\n---\nProcessing file: {file_path}")
         try:
             df = pd.read_csv(file_path)
+            print(f"Columns in {file_path}: {list(df.columns)}")
+            print(f"First row: {df.iloc[0].to_dict() if not df.empty else '(empty)'}")
             # Convert column names to lowercase
             df.columns = [str(c).strip().lower() for c in df.columns]
             columns = df.columns
