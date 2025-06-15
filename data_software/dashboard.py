@@ -88,15 +88,19 @@ if not os.path.exists(DB_PATH):
 # Read forecast files
 forecast_files = glob.glob("forecast_*.parquet")
 if not forecast_files:
-    st.warning("No forecast files found. Please upload input data and run ETL.")
+    st.error("No forecast files found. Please check that ETL ran successfully and input data exists.")
     st.stop()
 
-# Read all forecasts
 dfs = []
 for file in forecast_files:
     df = pq.read_table(file).to_pandas()
     df['source_file'] = os.path.basename(file)
     dfs.append(df)
+
+if not dfs:
+    st.error("No forecast dataframes loaded. Please check your input data and ETL process.")
+    st.stop()
+
 forecast_df = pd.concat(dfs, ignore_index=True)
 
 # Read historical data from DB
