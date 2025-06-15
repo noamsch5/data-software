@@ -11,7 +11,6 @@ import os
 import numpy as np
 from sqlalchemy import create_engine, text
 import glob
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -54,6 +53,8 @@ def read_streaming_file(file_path: Path) -> pd.DataFrame:
         
         # Map columns to standard names
         df = map_columns(df)
+        # Print columns after mapping for debug
+        logger.warning(f"File {file_path} columns after mapping: {list(df.columns)}")
         
         # Convert column names to lowercase
         df.columns = df.columns.str.lower()
@@ -250,7 +251,11 @@ def process_pivot_file(file_path: str) -> pd.DataFrame:
 
 def process_regular_file(file_path: str) -> pd.DataFrame:
     """Process regular report file"""
-    df = pd.read_excel(file_path)
+    # בדיקת סוג הקובץ
+    if file_path.lower().endswith('.csv'):
+        df = pd.read_csv(file_path)
+    else:
+        df = pd.read_excel(file_path)
     
     # מיפוי עמודות
     column_mapping = {
@@ -302,6 +307,43 @@ def main():
     print(df.head(10))
     # Optionally: save to DB or CSV for further use
     # df.to_csv('unified_distribution_data.csv', index=False)
+
+    # שלב תחזית: המודל לומד את הנתונים ומבצע תחזית
+    try:
+        from prophet import Prophet
+        from sklearn.ensemble import RandomForestRegressor
+        import numpy as np
+
+        # הכנת הנתונים לתחזית
+        df['date'] = pd.to_datetime(df['Month'])
+        df_agg = df.groupby('date')['Revenue'].sum().reset_index()
+        df_agg.columns = ['ds', 'y']
+
+        # מודל Prophet
+        model_prophet = Prophet(yearly_seasonality=True, weekly_seasonality=False)
+        model_prophet.fit(df_agg)
+        future_prophet = model_prophet.make_future_dataframe(periods=12, freq='M')
+        forecast_prophet = model_prophet.predict(future_prophet)
+
+        # מודל Random Forest
+        X = np.array(range(len(df_agg))).reshape(-1, 1)
+        y = df_agg['y'].values
+        model_rf = RandomForestRegressor(n_estimators=100, random_state=42)
+        model_rf.fit(X, y)
+        future_rf = np.array(range(len(df_agg), len(df_agg) + 12)).reshape(-1, 1)
+        forecast_rf = model_rf.predict(future_rf)
+
+        # שמירת התחזיות בטבלה forecasts
+        engine = create_engine(DATABASE_URL)
+        forecast_df = pd.DataFrame({
+            'date': future_prophet['ds'],
+            'prophet_forecast': forecast_prophet['yhat'],
+            'rf_forecast': np.concatenate([y, forecast_rf])
+        })
+        forecast_df.to_sql('forecasts', engine, if_exists='replace', index=False)
+        print("התחזיות נשמרו בהצלחה בטבלה forecasts.")
+    except Exception as e:
+        print(f"שגיאה בביצוע התחזית: {e}")
 
 def init_db():
     """Create the database and tables only, without inserting sample data."""
@@ -403,56 +445,62 @@ def process_distribution_statements():
     input_dir = 'input'
     all_data = []
 
-    for file_path in glob.glob(os.path.join(input_dir, '*.csv')):
-        df = pd.read_csv(file_path)
-        columns = df.columns.str.lower()
-        # Detect Create Music Group format
-        if 'recipient net royalty ($ usd)' in columns:
-            # Map columns
-            df_unified = pd.DataFrame({
-                'ISRC': df['ISRC'],
-                'UPC': df['UPC'],
-                'Track Title': df['Title'],
-                'Artist': df['Artist'],
-                'Platform': df['Store'],
-                'Country': df['Country'],
-                'Month': pd.to_datetime(df['Month']).dt.to_period('M').astype(str),
-                'Quantity': df['Quantity'],
-                'Revenue': df['Recipient Net Royalty ($ USD)']
-            })
-        # Detect Amp format
-        elif 'revenue' in columns and 'track title' in columns:
-            # Convert GBP to USD if needed
-            revenue = df['Revenue']
-            if 'Amp' in file_path:
-                revenue = revenue * 1.35
-            # Use Period From as month if exists
-            if 'Period From' in df.columns:
-                # Print problematic dates
-                bad_dates = df[~df['Period From'].astype(str).str.match(r'^20\\d{2}-\\d{2}-\\d{2}$')]['Period From']
-                if not bad_dates.empty:
-                    print(f"Invalid dates in file {file_path}: {bad_dates.tolist()}")
-                # Only keep rows with valid dates
-                valid_mask = df['Period From'].astype(str).str.match(r'^20\\d{2}-\\d{2}-\\d{2}$')
-                df = df[valid_mask]
-                month = pd.to_datetime(df['Period From']).dt.to_period('M').astype(str)
+    files = glob.glob(os.path.join(input_dir, '*.csv'))
+    print(f"נמצאו {len(files)} קבצים בתיקייה: {input_dir}")
+    for file_path in files:
+        print(f'---\nבודק קובץ: {file_path}')
+        try:
+            df = pd.read_csv(file_path)
+            # הפיכת שמות עמודות ל-lowercase
+            df.columns = [str(c).strip().lower() for c in df.columns]
+            columns = df.columns
+            print(f'עמודות: {list(df.columns)}')
+            print(f'שורה ראשונה: {df.iloc[0].to_dict() if not df.empty else "(ריק)"}')
+            # Detect Create Music Group format
+            if 'recipient net royalty ($ usd)' in columns:
+                print('זוהה פורמט: Create Music Group')
+                df_unified = pd.DataFrame({
+                    'ISRC': df['isrc'],
+                    'UPC': df['upc'] if 'upc' in columns else '',
+                    'Track Title': df['title'] if 'title' in columns else df['track title'],
+                    'Artist': df['artist'],
+                    'Platform': df['store'] if 'store' in columns else df['platform'],
+                    'Country': df['country'],
+                    'Month': pd.to_datetime(df['month']).dt.to_period('M').astype(str),
+                    'Quantity': df['quantity'],
+                    'Revenue': df['recipient net royalty ($ usd)']
+                })
+            # Detect Amp format
+            elif 'revenue' in columns and ('track title' in columns or 'title' in columns):
+                print('זוהה פורמט: Amp')
+                revenue = df['revenue']
+                if 'amp' in file_path.lower():
+                    revenue = revenue * 1.35
+                # Use Period From as month if exists
+                if 'period from' in columns:
+                    month = pd.to_datetime(df['period from'], errors='coerce').dt.to_period('M').astype(str)
+                elif 'transaction date' in columns:
+                    month = pd.to_datetime(df['transaction date'], errors='coerce').dt.to_period('M').astype(str)
+                else:
+                    month = ''
+                df_unified = pd.DataFrame({
+                    'ISRC': df['isrc'] if 'isrc' in columns else '',
+                    'UPC': df['upc'] if 'upc' in columns else '',
+                    'Track Title': df['track title'] if 'track title' in columns else df['title'],
+                    'Artist': df['artist'] if 'artist' in columns else '',
+                    'Platform': df['distributor'] if 'distributor' in columns else (df['label'] if 'label' in columns else ''),
+                    'Country': df['territory'] if 'territory' in columns else (df['country'] if 'country' in columns else ''),
+                    'Month': month,
+                    'Quantity': df['quantity'] if 'quantity' in columns else '',
+                    'Revenue': revenue
+                })
             else:
-                month = pd.to_datetime(df['Transaction Date'], errors='coerce').dt.to_period('M').astype(str)
-            df_unified = pd.DataFrame({
-                'ISRC': df['ISRC'],
-                'UPC': df['UPC'],
-                'Track Title': df['Track Title'],
-                'Artist': df['Artist'],
-                'Platform': df['Distributor'] if 'Distributor' in df.columns else df['Label'],
-                'Country': df['Territory'] if 'Territory' in df.columns else df['Country'],
-                'Month': month,
-                'Quantity': df['Quantity'],
-                'Revenue': revenue
-            })
-        else:
-            print(f"Unknown file format: {file_path}, columns: {df.columns}")
-            continue
-        all_data.append(df_unified)
+                print(f"קובץ לא מזוהה! columns: {df.columns}")
+                print(f"שמות עמודות דרושים: recipient net royalty ($ usd) או revenue + track title/title")
+                continue
+            all_data.append(df_unified)
+        except Exception as e:
+            print(f'שגיאה בקריאת קובץ {file_path}: {e}')
 
     if not all_data:
         print("No valid distribution data found.")
@@ -467,6 +515,14 @@ def process_distribution_statements():
         'Revenue': 'sum',
         'Quantity': 'sum'
     }).reset_index()
+
+    # שמירת הנתונים המאוחדים בטבלה monthly_revenue_total
+    try:
+        engine = create_engine(DATABASE_URL)
+        aggregated_data.to_sql('monthly_revenue_total', engine, if_exists='replace', index=False)
+        print("הנתונים נשמרו בהצלחה בטבלה monthly_revenue_total.")
+    except Exception as e:
+        print(f"שגיאה בשמירת הנתונים: {e}")
 
     return aggregated_data
 

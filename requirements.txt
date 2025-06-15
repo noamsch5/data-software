@@ -25,5 +25,5 @@ python-dotenv>=1.0.0
 watchdog>=3.0.0
 openpyxl>=3.1.2  # לתמיכה בקובצי Excel
 sqlalchemy>=2.0.0  # לעבודה עם SQLite
-plotly 
-lightgbm==4.3.0 
+plotly
+lightgbm==4.6.0 
