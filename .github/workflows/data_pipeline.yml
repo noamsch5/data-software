@@ -56,7 +56,7 @@ jobs:
 
       - name: Check required files
         run: |
-          cd "Data Software"
+          cd "data_software"
           if [ ! -f ".env" ]; then
             echo "Error: .env file is missing"
             exit 1
@@ -68,17 +68,17 @@ jobs:
 
       - name: Create required directories
         run: |
-          cd "Data Software"
+          cd "data_software"
           mkdir -p models input output data_raw
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r "Data Software/requirements.txt"
+          pip install -r "data_software/requirements.txt"
 
       - name: Backup existing data
         run: |
-          cd "Data Software"
+          cd "data_software"
           timestamp=$(date +%Y%m%d_%H%M%S)
           mkdir -p backups
           if [ -f "streaming_data.db" ]; then
@@ -90,12 +90,12 @@ jobs:
 
       - name: Run ETL
         run: |
-          cd "Data Software"
+          cd "data_software"
           python etl.py
 
       - name: Run Forecast
         run: |
-          cd "Data Software"
+          cd "data_software"
           python run_forecast.py
 
       - name: Commit and push if changes
