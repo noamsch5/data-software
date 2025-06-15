@@ -1,3 +1,9 @@
+import os
+
+# Ensure required directories exist
+for directory in ["data", "input", "processed"]:
+    os.makedirs(directory, exist_ok=True)
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -9,7 +15,6 @@ from plotly.subplots import make_subplots
 import plotly.express as px
 from config import DB_PATH, PLATFORMS, COST_CATEGORIES, CAMPAIGN_TYPES, CAMPAIGN_STATUSES, MUSIC_EVENTS
 import glob
-import os
 from prophet import Prophet
 from sqlalchemy import create_engine
 from config import DATABASE_URL
