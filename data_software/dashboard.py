@@ -13,6 +13,7 @@ import os
 from prophet import Prophet
 from sqlalchemy import create_engine
 from config import DATABASE_URL
+from data_software import etl
 
 st.set_page_config(
     page_title="On The Way Records - Revenue Forecast",
@@ -63,6 +64,11 @@ def run_forecast():
         st.success("Forecasts generated and saved successfully")
     else:
         st.error("No forecasts generated (insufficient data for platforms)")
+
+# Check if database exists, if not run ETL
+if not os.path.exists(DB_PATH):
+    st.warning("Database not found. Running ETL to create it...")
+    etl.main()
 
 # Read forecast files
 forecast_files = glob.glob("forecast_*.parquet")
