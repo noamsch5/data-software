@@ -444,26 +444,38 @@ def main():
     distribution_data = process_distribution_statements()
     print("Distribution data processed successfully.")
 
-    # Continue with existing forecasting logic
-    for platform in PLATFORMS:
-        try:
-            forecaster = RevenueForecaster(platform)
-            forecast = forecaster.forecast()
-            forecaster.save_models()
-            
-            # שמירת התחזית
-            forecast.to_sql(
-                'forecasts',
-                forecaster.engine,
-                if_exists='append',
-                index=False
-            )
-            
-            logger.info(f"Successfully forecasted {platform}")
-            
-        except Exception as e:
-            logger.error(f"Error forecasting {platform}: {str(e)}")
-            continue
+    # Load all data
+    df = load_data()
+    # קבלת כל הערכים הייחודיים
+    platforms = df['platform'].unique()
+    tracks = df['track_id'].unique()
+    countries = df['country'].unique()
+    period_types = df['period_type'].unique() if 'period_type' in df.columns else ['month']
+
+    for platform in platforms:
+        for track_id in tracks:
+            for country in countries:
+                for period_type in period_types:
+                    try:
+                        # סינון לפי פילוחים
+                        data = df[(df['platform'] == platform) & (df['track_id'] == track_id) & (df['country'] == country) & (df['period_type'] == period_type)]
+                        if len(data) < 6:
+                            continue  # לא מספיק נתונים לתחזית
+                        model, scaler, feature_cols = train_model(data, platform, period_type)
+                        if model is None:
+                            continue
+                        last_date = data['date'].max()
+                        forecast = generate_forecast(model, scaler, feature_cols, last_date, platform, period_type)
+                        forecast['track_id'] = track_id
+                        forecast['country'] = country
+                        forecast['period_type'] = period_type
+                        # שמירת התחזית
+                        engine = create_engine(DATABASE_URL)
+                        forecast.to_sql('forecasts', engine, if_exists='append', index=False)
+                        logger.info(f"Successfully forecasted {platform} | {track_id} | {country} | {period_type}")
+                    except Exception as e:
+                        logger.error(f"Error forecasting {platform} | {track_id} | {country} | {period_type}: {str(e)}")
+                        continue
 
 if __name__ == '__main__':
     main() 

@@ -131,19 +131,16 @@ def normalize_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def fill_missing_dates(df: pd.DataFrame) -> pd.DataFrame:
-    """Fill missing dates with 0 revenue, group by month and platform, and create a 'date' column (YYYY-MM-01)"""
-    # Convert date to month
+    """Fill missing dates with 0 revenue, group by month, platform, track_id, country, and create a 'date' column (YYYY-MM-01)"""
     df['month'] = df['date'].dt.to_period('M').dt.to_timestamp()
-    # Group by month and platform, sum revenue
-    grouped = df.groupby(['month', 'platform'])['revenue_usd'].sum().reset_index()
-    # צור עמודת date בפורמט YYYY-MM-01
+    # Group by month, platform, track_id, country, sum revenue
+    grouped = df.groupby(['month', 'platform', 'track_id', 'country'])['revenue_usd'].sum().reset_index()
     grouped['date'] = grouped['month']
-    # סדר עמודות
-    grouped = grouped[['date', 'platform', 'revenue_usd']]
+    grouped = grouped[['date', 'platform', 'track_id', 'country', 'revenue_usd']]
     return grouped
 
 def update_database(df: pd.DataFrame) -> None:
-    """Update database"""
+    """Update database with all relevant columns"""
     print(f"update_database: df.shape={df.shape}, columns={df.columns.tolist()}")
     try:
         conn = sqlite3.connect(DB_PATH)

@@ -49,6 +49,15 @@ period_types = sorted([str(x) for x in forecast_df['period_type'].dropna().uniqu
 platform = st.selectbox("Select Platform", platforms, key='platform_selector')
 period_type = st.selectbox("Select Period Type", period_types, key='period_type_selector')
 
+# Multiselect selectors
+all_platforms = sorted(forecast_df['platform'].dropna().unique())
+all_tracks = sorted(forecast_df['track_id'].dropna().unique()) if 'track_id' in forecast_df.columns else []
+all_countries = sorted(forecast_df['country'].dropna().unique()) if 'country' in forecast_df.columns else []
+
+selected_platforms = st.multiselect("בחר פלטפורמות", all_platforms, default=all_platforms)
+selected_tracks = st.multiselect("בחר טראקים", all_tracks, default=all_tracks)
+selected_countries = st.multiselect("בחר מדינות", all_countries, default=all_countries)
+
 # Filter data
 if period_type == 'overall':
     # מציגים רק את שורת Overall
@@ -58,31 +67,43 @@ else:
     hist = hist_df[(hist_df['platform'] == platform) & (hist_df['period_type'] == period_type)]
     forecast = forecast_df[(forecast_df['platform'] == platform) & (forecast_df['period_type'] == period_type)]
 
+# סינון נתונים לפי בחירה
+filtered_hist = hist_df[
+    hist_df['platform'].isin(selected_platforms) &
+    hist_df['track_id'].isin(selected_tracks) &
+    hist_df['country'].isin(selected_countries)
+]
+filtered_forecast = forecast_df[
+    forecast_df['platform'].isin(selected_platforms) &
+    forecast_df['track_id'].isin(selected_tracks) &
+    forecast_df['country'].isin(selected_countries)
+]
+
 # KPIs
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Total Historical Revenue", f"${hist['revenue_usd'].sum():,.0f}")
+    st.metric("Total Historical Revenue", f"${filtered_hist['revenue_usd'].sum():,.0f}")
 with col2:
-    st.metric("Average per Period", f"${hist['revenue_usd'].mean():,.0f}")
+    st.metric("Average per Period", f"${filtered_hist['revenue_usd'].mean():,.0f}")
 with col3:
-    if len(hist) > 1:
-        delta = hist['revenue_usd'].iloc[-1] - hist['revenue_usd'].iloc[-2]
+    if len(filtered_hist) > 1:
+        delta = filtered_hist['revenue_usd'].iloc[-1] - filtered_hist['revenue_usd'].iloc[-2]
         st.metric("Change from Previous Period", f"${delta:,.0f}")
     else:
         st.metric("Change from Previous Period", "N/A")
 with col4:
-    st.metric("Total Forecast (12 periods)", f"${forecast['predicted_revenue'].sum():,.0f}")
+    st.metric("Total Forecast (12 periods)", f"${filtered_forecast['predicted_revenue'].sum():,.0f}")
 
 # Historical + Forecast Revenue Graph
 fig = go.Figure()
-if not hist.empty:
+if not filtered_hist.empty:
     fig.add_trace(go.Scatter(
-        x=hist['date'], y=hist['revenue_usd'],
+        x=filtered_hist['date'], y=filtered_hist['revenue_usd'],
         mode='lines+markers', name='History', line=dict(color='royalblue')
     ))
-if not forecast.empty:
+if not filtered_forecast.empty:
     fig.add_trace(go.Scatter(
-        x=forecast['date'], y=forecast['predicted_revenue'],
+        x=filtered_forecast['date'], y=filtered_forecast['predicted_revenue'],
         mode='lines+markers', name='Forecast', line=dict(color='orange', dash='dash')
     ))
 fig.update_layout(
@@ -96,12 +117,12 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Platform Comparison
 st.subheader("Platform Comparison (Forecast)")
-comp = forecast_df[forecast_df['period_type'] == period_type].groupby('platform')['predicted_revenue'].sum().sort_values(ascending=False)
+comp = filtered_forecast.groupby('platform')['predicted_revenue'].sum().sort_values(ascending=False)
 st.bar_chart(comp)
 
 # טבלת תחזית מסודרת
 st.subheader("Forecast Table")
-forecast_table = forecast_df[(forecast_df['platform'] == platform) & (forecast_df['period_type'] == period_type)][['date', 'predicted_revenue']]
+forecast_table = filtered_forecast[['date', 'predicted_revenue']]
 forecast_table = forecast_table.rename(columns={'date': 'Date', 'predicted_revenue': 'Forecasted Revenue ($)'})
 forecast_table['Date'] = pd.to_datetime(forecast_table['Date']).dt.strftime('%Y-%m-%d')
 st.dataframe(forecast_table, hide_index=True)
