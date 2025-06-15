@@ -65,19 +65,29 @@ jobs:
             echo "Error: etl.py is missing"
             exit 1
           fi
+          if [ ! -f "run_forecast 2.py" ]; then
+            echo "Error: run_forecast 2.py is missing"
+            exit 1
+          fi
 
       - name: Create required directories
         run: |
-          mkdir -p data input processed
+          mkdir -p data input processed models
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r "data_software/requirements.txt"
 
-      - name: Run ETL (includes forecast)
+      - name: Run ETL
         run: |
-          python data_software/etl.py
+          cd "data_software"
+          python etl.py
+
+      - name: Run Forecast
+        run: |
+          cd "data_software"
+          python "run_forecast 2.py"
 
       - name: Commit and push if changes
         env:
