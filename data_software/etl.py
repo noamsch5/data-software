@@ -442,19 +442,20 @@ def process_distribution_statements():
     """
     Process distribution statements from the input folder.
     Supports both Create Music Group and Amp file formats.
-    Detects file type by columns, maps the correct columns, and outputs a unified DataFrame:
-    Platform, Month, Revenue (USD)
+    Detects file type by columns, maps the correct columns, and outputs a unified DataFrame.
     """
-    input_dir = 'input'
+    input_dirs = ['input', 'data_software/input']
     all_data = []
-
-    files = glob.glob(os.path.join(input_dir, '*.csv'))
-    if not files:
-        print("No input files found in 'input/'. Please upload at least one CSV file.")
+    found_files = []
+    for input_dir in input_dirs:
+        files = glob.glob(os.path.join(input_dir, '*.csv'))
+        found_files.extend(files)
+    print(f"Found {len(found_files)} input files: {found_files}")
+    if not found_files:
+        print("No input files found in 'input/' or 'data_software/input/'. Please upload at least one CSV file.")
         return pd.DataFrame()
-    print(f"Found {len(files)} files in directory: {input_dir}")
-    for file_path in files:
-        print(f'---\nChecking file: {file_path}')
+    for file_path in found_files:
+        print(f"Processing file: {file_path}")
         try:
             df = pd.read_csv(file_path)
             # Convert column names to lowercase
