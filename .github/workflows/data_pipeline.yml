@@ -26,8 +26,8 @@ jobs:
           PLATFORM_PAYOUT_BEATPORT=1.25
 
           # Database settings
-          DB_PATH=mvp.db
-          DATABASE_URL=sqlite:///mvp.db
+          DB_PATH=data/revenue.db
+          DATABASE_URL=sqlite:///data/revenue.db
 
           # Prophet settings
           PROPHET_CHANGEPOINT_PRIOR_SCALE=0.05
@@ -61,42 +61,23 @@ jobs:
             echo "Error: .env file is missing"
             exit 1
           fi
-          if [ ! -f "etl.py" ] || [ ! -f "run_forecast.py" ]; then
-            echo "Error: Required Python files are missing"
+          if [ ! -f "etl.py" ]; then
+            echo "Error: etl.py is missing"
             exit 1
           fi
 
       - name: Create required directories
         run: |
-          cd "data_software"
-          mkdir -p models input output data_raw
+          mkdir -p data input processed
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r "data_software/requirements.txt"
 
-      - name: Backup existing data
+      - name: Run ETL (includes forecast)
         run: |
-          cd "data_software"
-          timestamp=$(date +%Y%m%d_%H%M%S)
-          mkdir -p backups
-          if [ -f "streaming_data.db" ]; then
-            cp streaming_data.db "backups/streaming_data_${timestamp}.db"
-          fi
-          if [ -d "models" ]; then
-            tar -czf "backups/models_${timestamp}.tar.gz" models/
-          fi
-
-      - name: Run ETL
-        run: |
-          cd "data_software"
-          python etl.py
-
-      - name: Run Forecast
-        run: |
-          cd "data_software"
-          python run_forecast.py
+          python data_software/etl.py
 
       - name: Commit and push if changes
         env:
@@ -106,8 +87,3 @@ jobs:
           git config --local user.name "GitHub Action"
           git add .
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update data and forecasts [skip ci]" && git push)
-
-      - name: Cleanup old backups
-        run: |
-          cd "Data Software/backups"
-          find . -type f -mtime +7 -delete  # מחק גיבויים ישנים מ-7 ימים
