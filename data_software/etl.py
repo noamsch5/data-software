@@ -152,8 +152,7 @@ def fill_missing_dates(df: pd.DataFrame) -> pd.DataFrame:
         cols.append('country')
     if 'title' in grouped.columns:
         cols.append('title')
-    # שמירה רק על עמודות רלוונטיות
-    grouped = grouped[[c for c in cols if c in grouped.columns]]
+    grouped = grouped[cols]
     return grouped
 
 def update_database(df: pd.DataFrame) -> None:
@@ -373,10 +372,14 @@ def init_db():
     tables = {
         'monthly_revenue_total': """
             CREATE TABLE IF NOT EXISTS monthly_revenue_total (
-                date DATE PRIMARY KEY,
+                date DATE,
                 platform TEXT,
                 revenue_usd REAL,
-                period_type TEXT
+                period_type TEXT,
+                country TEXT,
+                track_id TEXT,
+                title TEXT,
+                PRIMARY KEY (date, platform, country, track_id)
             )
         """,
         'campaigns': """
