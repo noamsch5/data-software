@@ -13,7 +13,17 @@ import os
 from prophet import Prophet
 from sqlalchemy import create_engine
 from config import DATABASE_URL
-from data_software import etl
+import sys
+import importlib.util
+
+# Add the parent directory to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# Import etl module
+etl_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'etl.py')
+spec = importlib.util.spec_from_file_location("etl", etl_path)
+etl = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(etl)
 
 st.set_page_config(
     page_title="On The Way Records - Revenue Forecast",
