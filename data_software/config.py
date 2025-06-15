@@ -19,11 +19,15 @@ OUTPUT_DIR = BASE_DIR / 'output'
 MODELS_DIR = BASE_DIR / 'models'
 
 # מסד נתונים
-DB_PATH = os.getenv('DB_PATH', 'mvp.db')
-DATABASE_URL = os.getenv('DATABASE_URL', f"sqlite:///{BASE_DIR}/mvp.db")
+DB_PATH = 'data/revenue.db'
+DATABASE_URL = f'sqlite:///{DB_PATH}'
 
 # פלטפורמות
-PLATFORMS = ['Spotify', 'Sales', 'Overall']
+PLATFORMS = {
+    'Spotify': 0.004,
+    'Beatport': 0.5,
+    'Overall': 0.0  # This will be calculated as the sum of all platforms
+}
 
 # קטגוריות עלויות
 COST_CATEGORIES = [
@@ -98,4 +102,11 @@ PROPHET_PARAMS = {
     'changepoint_prior_scale': 0.05,
     'seasonality_prior_scale': 10.0,
     'seasonality_mode': 'multiplicative'
-} 
+}
+
+# Directory settings
+PROCESSED_DATA_DIR = 'processed'
+
+# Create necessary directories
+for directory in [RAW_DATA_DIR, PROCESSED_DATA_DIR]:
+    Path(directory).mkdir(parents=True, exist_ok=True) 

@@ -10,6 +10,9 @@ import plotly.express as px
 from config import DB_PATH, PLATFORMS, COST_CATEGORIES, CAMPAIGN_TYPES, CAMPAIGN_STATUSES, MUSIC_EVENTS
 import glob
 import os
+from prophet import Prophet
+from sqlalchemy import create_engine
+from config import DATABASE_URL
 
 st.set_page_config(
     page_title="On The Way Records - Revenue Forecast",
@@ -20,11 +23,53 @@ st.set_page_config(
 st.title("🎵 On The Way Records - Revenue Forecast")
 st.markdown("### Revenue Forecast Dashboard for Music Platforms")
 
+def run_forecast():
+    """Run forecast for all platforms and save results"""
+    engine = create_engine(DATABASE_URL)
+    monthly = pd.read_sql('SELECT * FROM monthly_revenue_total', engine)
+    platforms = ['Overall', 'Beatport', 'Spotify']
+    all_forecasts = []
+    
+    for platform in platforms:
+        df_platform = monthly[monthly['platform'] == platform].sort_values('date')
+        if len(df_platform) < 3:
+            continue
+            
+        df_agg = df_platform.groupby('date')['revenue_usd'].sum().reset_index()
+        df_agg.columns = ['ds', 'y']
+        
+        model = Prophet(yearly_seasonality=True, weekly_seasonality=False)
+        model.fit(df_agg)
+        
+        future = model.make_future_dataframe(periods=12, freq='M')
+        forecast = model.predict(future)
+        
+        forecast_out = pd.DataFrame({
+            'date': forecast['ds'],
+            'platform': platform,
+            'period_type': 'month',
+            'predicted_revenue': forecast['yhat']
+        })
+        
+        # Save to parquet file
+        table = pa.Table.from_pandas(forecast_out)
+        pq.write_table(table, f"forecast_{platform.lower()}.parquet")
+        all_forecasts.append(forecast_out)
+    
+    # Combine all forecasts and save to DB
+    if all_forecasts:
+        all_forecasts_df = pd.concat(all_forecasts, ignore_index=True)
+        all_forecasts_df.to_sql('forecasts', engine, if_exists='replace', index=False)
+        st.success("Forecasts generated and saved successfully")
+    else:
+        st.error("No forecasts generated (insufficient data for platforms)")
+
 # Read forecast files
 forecast_files = glob.glob("forecast_*.parquet")
 if not forecast_files:
-    st.warning("No forecast files found. Please run the forecast script first.")
-    st.stop()
+    st.warning("No forecast files found. Running forecast generation...")
+    run_forecast()
+    forecast_files = glob.glob("forecast_*.parquet")
 
 # Read all forecasts
 dfs = []
@@ -34,7 +79,7 @@ for file in forecast_files:
     dfs.append(df)
 forecast_df = pd.concat(dfs, ignore_index=True)
 
-# Read historical data from DB (if exists)
+# Read historical data from DB
 def load_history():
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("SELECT * FROM monthly_revenue_total", conn)
@@ -44,66 +89,44 @@ def load_history():
 hist_df = load_history()
 
 # Platform and period_type selectors
-platforms = ['Spotify', 'Sales', 'Overall']
+platforms = ['Overall', 'Beatport', 'Spotify']
 period_types = sorted([str(x) for x in forecast_df['period_type'].dropna().unique()])
 platform = st.selectbox("Select Platform", platforms, key='platform_selector')
 period_type = st.selectbox("Select Period Type", period_types, key='period_type_selector')
 
-# Multiselect selectors
-all_platforms = sorted(forecast_df['platform'].dropna().unique())
-all_tracks = sorted(forecast_df['track_id'].dropna().unique()) if 'track_id' in forecast_df.columns else []
-all_countries = sorted(forecast_df['country'].dropna().unique()) if 'country' in forecast_df.columns else []
-
-selected_platforms = st.multiselect("בחר פלטפורמות", all_platforms, default=all_platforms)
-selected_tracks = st.multiselect("בחר טראקים", all_tracks, default=all_tracks)
-selected_countries = st.multiselect("בחר מדינות", all_countries, default=all_countries)
-
 # Filter data
 if period_type == 'overall':
-    # מציגים רק את שורת Overall
     hist = hist_df[(hist_df['platform'] == 'Overall') & (hist_df['period_type'] == 'overall')]
     forecast = forecast_df[(forecast_df['platform'] == 'Overall') & (forecast_df['period_type'] == 'overall')]
 else:
     hist = hist_df[(hist_df['platform'] == platform) & (hist_df['period_type'] == period_type)]
     forecast = forecast_df[(forecast_df['platform'] == platform) & (forecast_df['period_type'] == period_type)]
 
-# סינון נתונים לפי בחירה
-filtered_hist = hist_df[
-    hist_df['platform'].isin(selected_platforms) &
-    hist_df['track_id'].isin(selected_tracks) &
-    hist_df['country'].isin(selected_countries)
-]
-filtered_forecast = forecast_df[
-    forecast_df['platform'].isin(selected_platforms) &
-    forecast_df['track_id'].isin(selected_tracks) &
-    forecast_df['country'].isin(selected_countries)
-]
-
 # KPIs
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    st.metric("Total Historical Revenue", f"${filtered_hist['revenue_usd'].sum():,.0f}")
+    st.metric("Total Historical Revenue", f"${hist['revenue_usd'].sum():,.0f}")
 with col2:
-    st.metric("Average per Period", f"${filtered_hist['revenue_usd'].mean():,.0f}")
+    st.metric("Average per Period", f"${hist['revenue_usd'].mean():,.0f}")
 with col3:
-    if len(filtered_hist) > 1:
-        delta = filtered_hist['revenue_usd'].iloc[-1] - filtered_hist['revenue_usd'].iloc[-2]
+    if len(hist) > 1:
+        delta = hist['revenue_usd'].iloc[-1] - hist['revenue_usd'].iloc[-2]
         st.metric("Change from Previous Period", f"${delta:,.0f}")
     else:
         st.metric("Change from Previous Period", "N/A")
 with col4:
-    st.metric("Total Forecast (12 periods)", f"${filtered_forecast['predicted_revenue'].sum():,.0f}")
+    st.metric("Total Forecast (12 periods)", f"${forecast['predicted_revenue'].sum():,.0f}")
 
 # Historical + Forecast Revenue Graph
 fig = go.Figure()
-if not filtered_hist.empty:
+if not hist.empty:
     fig.add_trace(go.Scatter(
-        x=filtered_hist['date'], y=filtered_hist['revenue_usd'],
+        x=hist['date'], y=hist['revenue_usd'],
         mode='lines+markers', name='History', line=dict(color='royalblue')
     ))
-if not filtered_forecast.empty:
+if not forecast.empty:
     fig.add_trace(go.Scatter(
-        x=filtered_forecast['date'], y=filtered_forecast['predicted_revenue'],
+        x=forecast['date'], y=forecast['predicted_revenue'],
         mode='lines+markers', name='Forecast', line=dict(color='orange', dash='dash')
     ))
 fig.update_layout(
@@ -117,17 +140,17 @@ st.plotly_chart(fig, use_container_width=True)
 
 # Platform Comparison
 st.subheader("Platform Comparison (Forecast)")
-comp = filtered_forecast.groupby('platform')['predicted_revenue'].sum().sort_values(ascending=False)
+comp = forecast_df.groupby('platform')['predicted_revenue'].sum().sort_values(ascending=False)
 st.bar_chart(comp)
 
-# טבלת תחזית מסודרת
+# Forecast Table
 st.subheader("Forecast Table")
-forecast_table = filtered_forecast[['date', 'predicted_revenue']]
+forecast_table = forecast[['date', 'predicted_revenue']]
 forecast_table = forecast_table.rename(columns={'date': 'Date', 'predicted_revenue': 'Forecasted Revenue ($)'})
 forecast_table['Date'] = pd.to_datetime(forecast_table['Date']).dt.strftime('%Y-%m-%d')
 st.dataframe(forecast_table, hide_index=True)
 
-st.caption('נבנה ע"י בינה מלאכותית - כל הזכויות שמורות.')
+st.caption('Built with AI - All rights reserved.')
 
 def load_data() -> pd.DataFrame:
     """Load data from monthly_revenue_total table"""
