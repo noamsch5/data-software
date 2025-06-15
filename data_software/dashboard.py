@@ -345,6 +345,34 @@ def main():
     - Seasonal decomposition shows trend and seasonal components
     """)
 
+    # אחרי הגרף הראשי וה-KPI, הוסף סקשן פילוחים מתקדמים
+    st.header('Advanced Analytics')
+
+    # פילוח הכנסות לפי מדינה לאורך זמן
+    if 'country' in hist_df.columns:
+        st.subheader('Revenue by Country Over Time')
+        country_pivot = hist_df.pivot_table(index='date', columns='country', values='revenue_usd', aggfunc='sum').fillna(0)
+        fig_country = go.Figure()
+        for country in country_pivot.columns:
+            fig_country.add_trace(go.Scatter(x=country_pivot.index, y=country_pivot[country], mode='lines+markers', name=country))
+        fig_country.update_layout(title='Revenue by Country (Stacked)', xaxis_title='Date', yaxis_title='Revenue ($)', legend_title='Country')
+        st.plotly_chart(fig_country, use_container_width=True)
+
+    # פילוח הכנסות לפי טראק
+    if 'track_id' in hist_df.columns:
+        st.subheader('Top Tracks Revenue')
+        top_tracks = hist_df.groupby('track_id')['revenue_usd'].sum().sort_values(ascending=False).head(10)
+        fig_tracks = px.bar(top_tracks, x=top_tracks.index, y=top_tracks.values, labels={'x':'Track ID','y':'Revenue ($)'}, title='Top 10 Tracks by Revenue')
+        st.plotly_chart(fig_tracks, use_container_width=True)
+
+    # פילוח טראקים פופולריים במדינות (heatmap)
+    if 'country' in hist_df.columns and 'track_id' in hist_df.columns:
+        st.subheader('Track Popularity by Country (Heatmap)')
+        heatmap_df = hist_df.groupby(['country','track_id'])['revenue_usd'].sum().reset_index()
+        heatmap_pivot = heatmap_df.pivot(index='country', columns='track_id', values='revenue_usd').fillna(0)
+        fig_heatmap = px.imshow(heatmap_pivot, labels=dict(x='Track ID', y='Country', color='Revenue ($)'), aspect='auto', title='Track Revenue by Country')
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+
 def update_forecast_chart(selected_platform, selected_period_type):
     if selected_platform == 'All Platforms':
         df_filtered = forecast_df

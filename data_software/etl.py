@@ -132,12 +132,28 @@ def normalize_dates(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def fill_missing_dates(df: pd.DataFrame) -> pd.DataFrame:
-    """Fill missing dates with 0 revenue, group by month, platform, track_id, country, and create a 'date' column (YYYY-MM-01)"""
+    """Fill missing dates with 0 revenue, group by month, platform, track_id, country, title, and create a 'date' column (YYYY-MM-01)"""
     df['month'] = df['date'].dt.to_period('M').dt.to_timestamp()
-    # Group by month, platform, track_id, country, sum revenue
-    grouped = df.groupby(['month', 'platform', 'track_id', 'country'])['revenue_usd'].sum().reset_index()
+    # Group by month, platform, track_id, country, title, sum revenue
+    group_cols = ['month', 'platform']
+    if 'track_id' in df.columns:
+        group_cols.append('track_id')
+    if 'country' in df.columns:
+        group_cols.append('country')
+    if 'title' in df.columns:
+        group_cols.append('title')
+    grouped = df.groupby(group_cols)['revenue_usd'].sum().reset_index()
     grouped['date'] = grouped['month']
-    grouped = grouped[['date', 'platform', 'track_id', 'country', 'revenue_usd']]
+    # סדר עמודות
+    cols = ['date', 'platform', 'revenue_usd']
+    if 'track_id' in grouped.columns:
+        cols.append('track_id')
+    if 'country' in grouped.columns:
+        cols.append('country')
+    if 'title' in grouped.columns:
+        cols.append('title')
+    # שמירה רק על עמודות רלוונטיות
+    grouped = grouped[[c for c in cols if c in grouped.columns]]
     return grouped
 
 def update_database(df: pd.DataFrame) -> None:
@@ -528,20 +544,23 @@ def process_distribution_statements():
         monthly['platform'] = monthly['Platform']
         monthly['revenue_usd'] = monthly['Revenue']
         monthly['period_type'] = 'month'
-        
+        if 'Country' in monthly.columns:
+            monthly['country'] = monthly['Country']
+        if 'Track Title' in monthly.columns:
+            monthly['title'] = monthly['Track Title']
+        if 'ISRC' in monthly.columns:
+            monthly['track_id'] = monthly['ISRC']
         # Add Overall platform
         overall = monthly.groupby('date').agg({
             'revenue_usd': 'sum'
         }).reset_index()
         overall['platform'] = 'Overall'
         overall['period_type'] = 'month'
-        
         # Combine platform-specific and overall data
         monthly_revenue_total = pd.concat([
-            monthly[['date', 'platform', 'revenue_usd', 'period_type']],
-            overall
+            monthly[['date', 'platform', 'revenue_usd', 'period_type', 'country', 'track_id', 'title']].copy(),
+            overall[['date', 'platform', 'revenue_usd', 'period_type']].copy()
         ], ignore_index=True)
-        
         monthly_revenue_total.to_sql('monthly_revenue_total', engine, if_exists='replace', index=False)
         print("Data saved successfully to monthly_revenue_total table.")
     except Exception as e:
