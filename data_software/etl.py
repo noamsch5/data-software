@@ -93,6 +93,11 @@ def read_streaming_file(file_path: Path) -> pd.DataFrame:
         if missing_columns:
             raise ValueError(f"Missing required columns: {missing_columns}")
         
+        # הוספת עמודות חסרות במידת הצורך
+        for col in ['country', 'track_id', 'title']:
+            if col not in df.columns:
+                df[col] = None
+        
         return df
     except Exception as e:
         logger.error(f"Error reading file {file_path}: {str(e)}")
@@ -301,6 +306,11 @@ def process_regular_file(file_path: str) -> pd.DataFrame:
     if 'platform' not in result_df.columns:
         result_df['platform'] = 'Overall'
     
+    # הוספת עמודות חסרות במידת הצורך
+    for col in ['country', 'track_id', 'title']:
+        if col not in result_df.columns:
+            result_df[col] = None
+    
     return result_df
 
 def process_file(file_path: str) -> None:
@@ -312,10 +322,6 @@ def process_file(file_path: str) -> None:
         else:
             df = process_regular_file(file_path)
         print(f"process_file: after processing {file_path}, df.shape={df.shape}, columns={df.columns.tolist()}")
-        # הוספת עמודות חסרות במידת הצורך
-        for col in ['country', 'track_id', 'title']:
-            if col not in df.columns:
-                df[col] = None
         update_database(df)
         logger.info(f"File {file_path} processed successfully")
     except Exception as e:
@@ -485,6 +491,10 @@ def process_distribution_statements():
         print(f"\n---\nProcessing file: {file_path}")
         try:
             df = pd.read_csv(file_path)
+            # הוספת עמודות חסרות במידת הצורך
+            for col in ['country', 'track_id', 'title']:
+                if col not in df.columns:
+                    df[col] = None
             print(f"Columns in {file_path}: {list(df.columns)}")
             print(f"First row: {df.iloc[0].to_dict() if not df.empty else '(empty)'}")
             # Convert column names to lowercase
