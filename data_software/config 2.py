@@ -21,7 +21,7 @@ OUTPUT_DIR = BASE_DIR / 'output'
 MODELS_DIR = BASE_DIR / 'models'
 
 # מסד נתונים
-DATABASE_URL = f"sqlite:///{BASE_DIR}/mvp.db"
+DATABASE_URL = 'sqlite:///data_software/data/revenue.db'
 
 # פלטפורמות
 PLATFORMS = ['Spotify', 'Sales', 'Overall']
@@ -91,8 +91,10 @@ for dir_path in [RAW_DATA_DIR, OUTPUT_DIR, MODELS_DIR]:
     dir_path.mkdir(exist_ok=True)
 
 # Database settings
-DB_PATH = 'mvp.db'
 SAMPLE_DATA_DIR = 'sample_data'
+
+# הגדרות מסד נתונים
+DB_PATH = 'data_software/data/revenue.db'
 
 # Prophet settings
 FORECAST_DAYS = 90
