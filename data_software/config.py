@@ -19,8 +19,8 @@ OUTPUT_DIR = BASE_DIR / 'output'
 MODELS_DIR = BASE_DIR / 'models'
 
 # מסד נתונים
-DB_PATH = 'data/revenue.db'
-DATABASE_URL = f'sqlite:///{DB_PATH}'
+DB_PATH = 'data_software/data/revenue.db'
+DATABASE_URL = 'sqlite:///data_software/data/revenue.db'
 
 # פלטפורמות
 PLATFORMS = {
