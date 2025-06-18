@@ -312,6 +312,10 @@ def process_file(file_path: str) -> None:
         else:
             df = process_regular_file(file_path)
         print(f"process_file: after processing {file_path}, df.shape={df.shape}, columns={df.columns.tolist()}")
+        # הוספת עמודות חסרות במידת הצורך
+        for col in ['country', 'track_id', 'title']:
+            if col not in df.columns:
+                df[col] = None
         update_database(df)
         logger.info(f"File {file_path} processed successfully")
     except Exception as e:
@@ -528,6 +532,10 @@ def process_distribution_statements():
         return pd.DataFrame()
 
     combined_data = pd.concat(all_data, ignore_index=True)
+    # הוספת עמודות חסרות במידת הצורך
+    for col in ['country', 'track_id', 'title']:
+        if col not in combined_data.columns:
+            combined_data[col] = None
 
     # Aggregate by Platform and Month
     aggregated_data = combined_data.groupby([
