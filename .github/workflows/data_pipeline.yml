@@ -81,13 +81,19 @@ jobs:
 
       - name: Run ETL
         run: |
-          cd "data_software"
-          python etl.py
+          python data_software/etl.py
+
+      - name: Check DB exists
+        run: |
+          if [ ! -f data/revenue.db ]; then
+            echo "DB file not found!"
+            ls -l data
+            exit 1
+          fi
 
       - name: Run Forecast
         run: |
-          cd "data_software"
-          python "run_forecast 2.py"
+          python "data_software/run_forecast 2.py"
 
       - name: Commit and push if changes
         env:
