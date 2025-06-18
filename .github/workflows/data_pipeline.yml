@@ -73,7 +73,6 @@ jobs:
       - name: Create required directories
         run: |
           mkdir -p data input processed models
-          mkdir -p data_software/data
 
       - name: Install dependencies
         run: |
