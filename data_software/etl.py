@@ -156,8 +156,12 @@ def fill_missing_dates(df: pd.DataFrame) -> pd.DataFrame:
     return grouped
 
 def update_database(df: pd.DataFrame) -> None:
-    """Update database with all relevant columns"""
+    """Update database"""
     print(f"update_database: df.shape={df.shape}, columns={df.columns.tolist()}")
+    # הוספת עמודות חסרות במידת הצורך
+    for col in ['country', 'track_id', 'title']:
+        if col not in df.columns:
+            df[col] = None
     try:
         conn = sqlite3.connect(DB_PATH)
         df.to_sql('monthly_revenue_total', conn, if_exists='replace', index=False)
